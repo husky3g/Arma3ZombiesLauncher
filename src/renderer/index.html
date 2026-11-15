@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'">
+  <title>Zombies Launcher</title>
+  <link rel="stylesheet" href="../../node_modules/@fontsource/oswald/400.css">
+  <link rel="stylesheet" href="../../node_modules/@fontsource/oswald/600.css">
+  <link rel="stylesheet" href="../../node_modules/@fontsource/oswald/700.css">
+  <link rel="stylesheet" href="../../node_modules/@fontsource/inter/400.css">
+  <link rel="stylesheet" href="../../node_modules/@fontsource/inter/500.css">
+  <link rel="stylesheet" href="../../node_modules/@fontsource/inter/600.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="bg-splatter" aria-hidden="true"></div>
+
+  <header class="top">
+    <img class="logo" src="../../assets/logo.png" alt="Arma 3 Zombies Launcher">
+    <nav class="tabs" role="tablist">
+      <button class="tab" data-tab="favorites" role="tab">Favorites <span class="count" id="c-favorites">0</span></button>
+      <button class="tab" data-tab="browse" role="tab">Browse <span class="count" id="c-browse">0</span></button>
+      <button class="tab" data-tab="history" role="tab">History <span class="count" id="c-history">0</span></button>
+    </nav>
+    <div class="top-actions">
+      <button class="btn ghost" id="btn-add" title="Add a server by IP">
+        <svg><use href="#i-plus"/></svg><span>Add server</span></button>
+      <button class="btn ghost" id="btn-scan" title="Re-scan all servers">
+        <svg><use href="#i-radar"/></svg><span>Scan</span></button>
+      <button class="icon-btn lg" id="btn-settings" title="Settings"><svg><use href="#i-gear"/></svg></button>
+    </div>
+    <svg class="drips" id="drips" preserveAspectRatio="none" aria-hidden="true"></svg>
+  </header>
+
+  <div class="layout">
+    <aside class="filters" id="filters">
+      <div class="f-head">
+        <h2>Filters</h2>
+        <button class="link" id="f-reset">Reset</button>
+      </div>
+
+      <section class="f-sec">
+        <label class="f-label" for="f-name">Server name contains</label>
+        <div class="input-icon">
+          <svg><use href="#i-search"/></svg>
+          <input id="f-name" type="text" placeholder="e.g. Chernarus, PvE, EU…" autocomplete="off">
+        </div>
+      </section>
+
+      <section class="f-sec">
+        <label class="f-label" for="f-map">Map</label>
+        <select id="f-map" class="select"></select>
+        <div class="chips" id="f-map-chips"></div>
+      </section>
+
+      <section class="f-sec">
+        <label class="f-label" for="f-mod">Mods</label>
+        <div class="input-icon">
+          <svg><use href="#i-puzzle"/></svg>
+          <input id="f-mod" type="text" list="mod-options" placeholder="Type or pick a mod…" autocomplete="off">
+        </div>
+        <datalist id="mod-options"></datalist>
+        <div class="mod-actions">
+          <button class="btn small" id="f-mod-req" title="Only show servers running this mod">Require</button>
+          <button class="btn small danger-outline" id="f-mod-ex" title="Hide servers running this mod">Exclude</button>
+        </div>
+        <div class="chips" id="f-mod-chips"></div>
+      </section>
+
+      <section class="f-sec">
+        <div class="f-label">Game modes</div>
+        <div class="checklist" id="f-gametypes"></div>
+      </section>
+
+      <section class="f-sec">
+        <div class="f-label">Show</div>
+        <div class="toggles" id="f-show"></div>
+      </section>
+    </aside>
+
+    <main class="content">
+      <div class="list-head">
+        <div class="list-title">
+          <h1 id="list-title">Browse</h1>
+          <span class="muted" id="list-sub"></span>
+        </div>
+      </div>
+
+      <div class="table-wrap" id="table-wrap">
+        <table class="servers" id="servers">
+          <thead><tr id="thead-row"></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+        <div class="empty" id="empty" hidden></div>
+      </div>
+
+      <section class="details" id="details" hidden></section>
+    </main>
+  </div>
+
+  <footer class="status">
+    <div class="scan-state">
+      <span class="pulse" id="scan-pulse"></span>
+      <span id="scan-text">Idle</span>
+      <div class="bar"><div class="bar-fill" id="scan-bar"></div></div>
+    </div>
+    <div class="arma-state" id="arma-state"></div>
+  </footer>
+
+  <div class="toasts" id="toasts"></div>
+  <div class="modal-back" id="modal-back" hidden><div class="modal" id="modal" role="dialog" aria-modal="true"></div></div>
+
+  <!-- Icon sprite -->
+  <svg width="0" height="0" style="position:absolute">
+    <defs>
+      <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2.8l2.85 5.78 6.38.93-4.62 4.5 1.09 6.36L12 17.37l-5.7 3 1.09-6.36-4.62-4.5 6.38-.93z"/></symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 11a8 8 0 1 0-2.34 5.66M20 4v7h-7"/></symbol>
+      <symbol id="i-users" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.3-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c2 .7 3.2 2.4 3.5 5.2"/></g></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></g></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></g></symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/></symbol>
+      <symbol id="i-gear" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></g></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></g></symbol>
+      <symbol id="i-puzzle" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M10 3.5a2 2 0 0 1 4 0V5h4a1 1 0 0 1 1 1v4h-1.5a2 2 0 0 0 0 4H19v4a1 1 0 0 1-1 1h-4v-1.5a2 2 0 0 0-4 0V19H6a1 1 0 0 1-1-1v-4h1.5a2 2 0 0 0 0-4H5V6a1 1 0 0 1 1-1h4z"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="i-radar" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><path d="M12 12l6-6"/></g></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12.5-7.5z"/></symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></g></symbol>
+      <symbol id="i-external" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></symbol>
+      <symbol id="i-skull" viewBox="0 0 24 24"><path d="M12 2.5c-4.9 0-8.5 3.4-8.5 8 0 2.6 1.1 4.6 3 5.8V19a1.5 1.5 0 0 0 1.5 1.5h.8V18.6h1.4v1.9h3.6v-1.9h1.4v1.9h.8A1.5 1.5 0 0 0 17.5 19v-2.7c1.9-1.2 3-3.2 3-5.8 0-4.6-3.6-8-8.5-8zM8.6 14.3a2.1 2.1 0 1 1 0-4.2 2.1 2.1 0 0 1 0 4.2zm6.8 0a2.1 2.1 0 1 1 0-4.2 2.1 2.1 0 0 1 0 4.2zM12 15l-1.1 2h2.2z"/></symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
+      <symbol id="i-info" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.6" r=".6" fill="currentColor"/></g></symbol>
+      <symbol id="i-eye-off" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6 0 9.5 7 9.5 7a17 17 0 0 1-3 3.9M6.5 6.6C3.9 8.3 2.5 12 2.5 12S6 19 12 19a9.6 9.6 0 0 0 4.7-1.2M9.9 9.9a3 3 0 0 0 4.2 4.2"/></g></symbol>
+      <symbol id="i-eye" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7z"/><circle cx="12" cy="12" r="3"/></g></symbol>
+    </defs>
+  </svg>
+  <div class="ctx" id="ctx" role="menu" hidden></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

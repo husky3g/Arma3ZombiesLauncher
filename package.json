@@ -1,0 +1,41 @@
+{
+  "name": "zombies-launcher",
+  "productName": "Zombies Launcher",
+  "version": "1.0.0",
+  "description": "Arma 3 server browser that only shows zombie servers",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win portable"
+  },
+  "build": {
+    "appId": "com.zombieslauncher.app",
+    "productName": "Zombies Launcher",
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "node_modules/**/*"
+    ],
+    "asarUnpack": [
+      "node_modules/steamworks.js/**/*",
+      "node_modules/koffi/**/*",
+      "src/main/steam-servers-worker.js"
+    ],
+    "win": {
+      "target": "portable",
+      "icon": "assets/icon.png"
+    }
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/oswald": "^5.3.0",
+    "koffi": "^3.3.8",
+    "steamworks.js": "^0.4.0"
+  },
+  "devDependencies": {
+    "electron": "^45.3.2",
+    "electron-builder": "^26.18.0",
+    "sharp": "^0.35.5"
+  }
+}

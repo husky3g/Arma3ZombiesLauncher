@@ -21,6 +21,8 @@ const S = {
   progress: { phase: 'idle' },
 };
 
+const DONATE_URL = 'https://www.paypal.com/donate/?hosted_button_id=C8MKC6UF4QZE2';
+
 const SHOW_OPTS = [
   ['full', 'Full servers'],
   ['password', 'Password protected'],
@@ -837,6 +839,7 @@ function switchTab(tab) { S.tab = tab; S.selected = S.selected && rowsFor(tab).s
 function wire() {
   $$('.tab').forEach((t) => t.addEventListener('click', () => switchTab(t.dataset.tab)));
   $('#btn-settings').onclick = openSettings;
+  $('#btn-donate').onclick = () => zl.openExternal(DONATE_URL);
   $('#btn-add').onclick = openAddServer;
   $('#btn-scan').onclick = () => (S.progress.phase !== 'idle' ? zl.stopScan() : zl.scan());
 

@@ -143,6 +143,32 @@ function persist(part) {
   saveTimer = setTimeout(() => zl.setState(part), 250);
 }
 
+// Launcher self-update pop-up: downloading -> ready (Restart now / Later) or error (open release page)
+let updToast = null;
+function onUpdate(u) {
+  if (!['downloading', 'ready', 'error'].includes(u.status)) return;
+  if (u.status === 'error' && !u.version) return; // failed background check: stay quiet
+  if (!updToast || !updToast.isConnected) updToast = toast('', 'update', 0);
+  if (u.status === 'downloading') {
+    const pct = u.total ? (u.got / u.total) * 100 : 0;
+    updToast.className = 'toast update';
+    updToast.innerHTML = `<b>Updating to v${esc(u.version)}…</b><div class="bar"><div class="bar-fill" style="width:${pct.toFixed(1)}%"></div></div><div class="muted" style="margin-top:6px;font-size:12px">${(u.got / 1048576).toFixed(0)} / ${(u.total / 1048576).toFixed(0)} MB. You can keep using the launcher.</div>`;
+  } else if (u.status === 'ready') {
+    updToast.className = 'toast ok update';
+    updToast.innerHTML = `<b>Update v${esc(u.version)} is ready.</b><br>Restart now, or it installs automatically when you close the launcher.<div style="display:flex;gap:8px;margin-top:10px"><button class="btn small primary" data-upd="restart">Restart now</button><button class="btn small" data-upd="later">Later</button></div>`;
+  } else {
+    updToast.className = 'toast update';
+    updToast.innerHTML = `<b>Update v${esc(u.version)} couldn't be installed.</b><br>${esc(u.message)}${u.page ? `<div style="margin-top:10px"><button class="btn small" data-upd="page">Download it manually</button></div>` : ''}`;
+    updToast.dataset.page = u.page || '';
+  }
+  updToast.onclick = (e) => {
+    const b = e.target.closest('[data-upd]'); if (!b) return;
+    if (b.dataset.upd === 'restart') { b.disabled = true; b.textContent = 'Restarting…'; zl.updateRestart(); }
+    if (b.dataset.upd === 'later') updToast.remove();
+    if (b.dataset.upd === 'page' && updToast.dataset.page) zl.openExternal(updToast.dataset.page);
+  };
+}
+
 function toast(html, cls = '', ms = 4200) {
   const el = document.createElement('div');
   el.className = 'toast ' + cls; el.innerHTML = html;
@@ -766,7 +792,17 @@ function openSettings() {
       <div style="flex:1"><label class="f-label">Re-scan every (minutes)</label><input id="s-rescan" type="number" min="3" max="240" value="${esc(st.rescanMinutes)}"></div>
       <div style="flex:1.4;padding-top:22px"><label class="toggle"><span>Deep scan (check every server's mods)</span><input id="s-deep" type="checkbox" ${st.deepScan ? 'checked' : ''}><span class="sw"></span></label></div>
     </div>
+    <div class="row inline" style="align-items:center">
+      <div style="flex:1.4"><label class="toggle"><span>Update automatically from GitHub</span><input id="s-auto" type="checkbox" ${st.autoUpdate !== false ? 'checked' : ''}><span class="sw"></span></label></div>
+      <div style="flex:1;display:flex;gap:8px;align-items:center;justify-content:flex-end"><span class="muted" id="s-ver">v…</span><button class="btn small" id="s-checkupd">Check now</button></div>
+    </div>
     <div class="actions"><button class="btn" data-close>Cancel</button><button class="btn primary" id="s-save">Save</button></div>`);
+  zl.updateState().then((u) => { const v = $('#s-ver'); if (v) v.textContent = 'Version ' + u.current; if (!u.supported) { const b = $('#s-checkupd'); if (b) { b.disabled = true; b.title = 'Updates apply to the portable .exe build'; } } });
+  $('#s-checkupd').onclick = async () => {
+    const r = await zl.updateCheck();
+    if (r.status === 'current') toast('You have the latest version (v' + esc(r.version) + ').', 'ok');
+    else if (r.status === 'error') toast(esc(r.message));
+  };
   const updEnv = (env) => { S.env = env; $('#s-arma').value = env.armaPath || ''; renderArma(); S.modStatus.clear(); render(); };
   $('#s-browse').onclick = async () => updEnv(await zl.browseArma());
   $('#s-detect').onclick = async () => { const env = await zl.detectArma(''); updEnv(env); toast(env.armaPath ? 'Found Arma 3: ' + esc(env.armaPath) : 'Arma 3 was not found automatically.'); };
@@ -774,6 +810,7 @@ function openSettings() {
     const settings = {
       launchMethod: $('#s-launch').value, extraParams: $('#s-params').value,
       rescanMinutes: Math.max(3, +$('#s-rescan').value || 15), deepScan: $('#s-deep').checked,
+      autoUpdate: $('#s-auto').checked,
     };
     const st2 = await zl.setState({ settings });
     S.state.settings = st2.settings;
@@ -917,6 +954,7 @@ function wire() {
   zl.onProgress((p) => { S.progress = p; renderProgress(); if (p.phase === 'idle') { renderFilters(); render(); } });
   zl.onCatalog((c) => { S.catalog = c; throttleFilters(); });
   zl.onDownload(onDownload);
+  zl.onUpdate(onUpdate);
 }
 let filtTimer = null;
 function throttleFilters() { if (filtTimer) return; filtTimer = setTimeout(() => { filtTimer = null; if (!document.activeElement || !document.activeElement.closest('#filters')) renderFilters(); }, 1500); }

@@ -10,5 +10,6 @@ contextBridge.exposeInMainWorld('zl', {
   players: invoke('players'), addServer: invoke('addServer'), removeServer: invoke('removeServer'), mods: invoke('mods'),
   openExternal: invoke('openExternal'), downloadMods: invoke('downloadMods'), cancelDownload: invoke('cancelDownload'),
   join: invoke('join'), serverInfo: invoke('serverInfo'),
+  updateState: invoke('updateState'), updateCheck: invoke('updateCheck'), updateRestart: invoke('updateRestart'), onUpdate: on('update'),
   onServers: on('servers'), onRemoved: on('removed'), onProgress: on('progress'), onCatalog: on('catalog'), onDownload: on('download'),
 });

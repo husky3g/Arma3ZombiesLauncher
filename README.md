@@ -26,6 +26,9 @@ running a zombie mod. Regular Exile and other non-zombie servers are filtered ou
   required mods with sizes, and the estimated download size to join.
 * **Right-click menu**: join, download mods, info, players, refresh, favorite, copy IP, hide/unhide, remove from history.
 * **Hide servers** you never want to see. They disappear from every tab unless **Show → Hidden servers** is on.
+* **Auto-update**: on launch the portable .exe checks GitHub's latest release, then downloads and verifies the new version
+  (size + SHA-256). It updates on **Restart now** or when you close the launcher. You can turn this off in Settings.
+* **Donate** button in the status bar (PayPal).
 
 ## Run (development)
 ```

@@ -9,8 +9,26 @@ const { KNOWN_MAPS, KNOWN_GAMETYPES, mapLabel } = require('./classify');
 const arma = require('./arma');
 const { workshopDetails } = require('./workshop-info');
 const { discoverViaSteam, stopSteamDiscovery } = require('./steam-discovery');
+const { Updater } = require('./updater');
 
-let win, store, client, scanner, env = {}, rescanTimer = null, worker = null;
+let win, store, client, scanner, env = {}, rescanTimer = null, worker = null, updater = null;
+
+// Portable builds tell us where the real .exe lives (the app itself runs from a temp folder).
+// ZL_UPDATE_EXE / ZL_FAKE_VERSION exist only to test the update flow.
+function startUpdater() {
+  updater = new Updater({
+    currentVersion: process.env.ZL_FAKE_VERSION || app.getVersion(),
+    exePath: process.env.ZL_UPDATE_EXE || process.env.PORTABLE_EXECUTABLE_FILE || null,
+    log,
+  });
+  updater.cleanup();
+  updater.on('state', (s) => send('update', s));
+  if (!updater.supported || store.state.data.settings.autoUpdate === false) return;
+  setTimeout(async () => {
+    const s = await updater.check();
+    if (s.status === 'available') updater.download();
+  }, 4000);
+}
 
 function send(ch, data) { if (win && !win.isDestroyed()) win.webContents.send(ch, data); }
 
@@ -72,8 +90,21 @@ app.whenReady().then(async () => {
   if (env.armaPath && !store.state.data.settings.armaPath) { store.state.data.settings.armaPath = env.armaPath; store.state.save(); }
   createWindow();
   scheduleRescan();
+  startUpdater();
   devHooks();
 });
+
+// A downloaded update the player didn't restart for is installed when the launcher closes.
+app.on('will-quit', () => { if (updater && updater.ready) updater.apply(); });
+
+ipcMain.handle('updateState', () => ({ ...(updater ? updater.state : { status: 'idle' }), current: app.getVersion(), supported: !!(updater && updater.supported) }));
+ipcMain.handle('updateCheck', async () => {
+  if (!updater || !updater.supported) return { status: 'unsupported' };
+  const s = await updater.check();
+  if (s.status === 'available') updater.download();
+  return s;
+});
+ipcMain.handle('updateRestart', () => (updater ? updater.restart(app) : false));
 
 // Development helpers: ZL_SEED="ip:port,..." adds servers, ZL_SNAPSHOT="file.png" captures the window.
 async function devHooks() {

@@ -43,6 +43,7 @@ function createStore(dir) {
       extraParams: '-noSplash -skipIntro -world=empty',
       rescanMinutes: 15,
       deepScan: true,            // query mod lists of every Arma server to find zombie mods
+      autoUpdate: true,          // check GitHub for a newer launcher on start
     },
     filters: {
       name: '',

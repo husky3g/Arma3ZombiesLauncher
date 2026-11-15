@@ -14,16 +14,28 @@
     "files": [
       "src/**/*",
       "assets/**/*",
-      "node_modules/**/*"
+      "package.json"
     ],
     "asarUnpack": [
       "node_modules/steamworks.js/**/*",
       "node_modules/koffi/**/*",
-      "src/main/steam-servers-worker.js"
+      "src/main/steam-servers-worker.js",
+      "src/main/workshop-worker.js"
     ],
     "win": {
-      "target": "portable",
-      "icon": "assets/icon.png"
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.png",
+      "artifactName": "ZombiesLauncher-${version}-portable.exe"
+    },
+    "directories": {
+      "output": "dist"
     }
   },
   "license": "UNLICENSED",

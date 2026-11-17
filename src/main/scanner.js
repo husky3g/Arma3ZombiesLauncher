@@ -26,6 +26,7 @@ class Scanner extends EventEmitter {
     this.db = store.servers.data;
     this.catalog = store.catalog.data;
     this.changed = new Set();
+    this.listed = new Map();   // key -> when Steam's server list last included it (this session)
     this.scanning = false; this.cancel = false;
     this.flushTimer = setInterval(() => this._flushChanges(), 400);
     this._prune();
@@ -112,6 +113,7 @@ class Scanner extends EventEmitter {
       password: info.password, locked: !!info.locked, battleye: !!info.battleye, version: info.version,
       armaGameType: info.gameType || '', serverState: info.serverState ?? null, ping: info.ping, online: true, lastSeen: Date.now(), lastQueried: Date.now(),
       manual: (prev && prev.manual) || !!base.manual,
+      listedAt: this.listed.get(key) || (prev && prev.listedAt) || null,
     };
     const needRules = forceRules || !prev || !prev.rulesAt || Date.now() - prev.rulesAt > RULES_TTL || prev.name !== rec.name;
     if (needRules) {
@@ -183,7 +185,12 @@ class Scanner extends EventEmitter {
             const key = `${m.ip}:${m.queryPort}`;
             if (seen.has(key)) continue;
             seen.add(key); listed++;
-            if (this.db.servers[key] || m.responded === false) continue; // just refreshed / not answering
+            // remember when Steam last listed this address: duplicates of a server (mirrors answering with
+            // copies of its replies) often drop out of Steam's list, while the real address stays in it
+            this.listed.set(key, now);
+            const stored = this.db.servers[key];
+            if (stored) { stored.listedAt = now; this.changed.add(key); }
+            if (stored || m.responded === false) continue; // just refreshed / not answering
             const neg = this.db.negative[key];
             if (neg && now - neg.at < NEGATIVE_TTL && neg.name === m.name) continue;
             if (!this.settings.deepScan && !looksPromising(m)) continue;

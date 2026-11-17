@@ -202,6 +202,50 @@ const isHidden = (key) => (S.state.hidden || []).includes(key);
 const hiddenVisible = () => !!S.state.filters.show.hidden;
 const notHidden = (s) => hiddenVisible() || !isHidden(s.key);
 
+// ----------------------------------------------------------------------
+// Duplicate (mirrored) servers
+// Some servers show up in Steam's list under dozens of extra IP addresses that all answer with exactly the same
+// info (A2S mirrors/relays). They're collapsed into one row: the copy you favorited or joined, otherwise the
+// address Steam listed most recently (mirrors drop out of Steam's list, the real server stays), then the address
+// seen first. Generic default names ("Arma 3 Server") are never merged, since those are different servers.
+// ----------------------------------------------------------------------
+const GENERIC_NAME_RX = /^\s*(arma ?3( server)?|server)?\s*$/i;
+function fingerprint(s) {
+  if (!s.name || GENERIC_NAME_RX.test(s.name)) return null;
+  const mods = (s.mods || []).map((m) => m.steamId || m.hash || m.name).join(',');
+  return [s.name, s.gamePort, s.queryPort, (s.map || '').toLowerCase(), s.version, s.maxPlayers, s.password ? 1 : 0,
+    s.battleye ? 1 : 0, mods, (s.signatures || []).join(',')].join('|');
+}
+let dedupCache = { size: -1, at: 0, primary: null, groups: null };
+function dedup() {
+  // cheap enough to rebuild, but don't do it more than ~once a frame
+  if (dedupCache.size === S.servers.size && Date.now() - dedupCache.at < 250) return dedupCache;
+  const fav = new Set(S.state.favorites), hist = new Set(S.state.history.map((h) => h.key));
+  const rank = (s) => (fav.has(s.key) ? 0 : hist.has(s.key) ? 1 : 2);
+  const listed = (s) => Math.floor((s.listedAt || 0) / 1800e3); // same 30-min bucket = same Steam listing
+  const byFp = new Map();
+  for (const s of S.servers.values()) {
+    const fp = fingerprint(s);
+    if (!fp) continue;
+    const g = byFp.get(fp);
+    if (g) g.push(s); else byFp.set(fp, [s]);
+  }
+  const primary = new Map();   // key -> key of the row that represents it
+  const groups = new Map();    // primary key -> [all servers in the group]
+  for (const g of byFp.values()) {
+    if (g.length < 2) continue;
+    g.sort((a, b) => rank(a) - rank(b) || listed(b) - listed(a) || (a.firstSeen || 0) - (b.firstSeen || 0) || (a.ping || 999) - (b.ping || 999));
+    groups.set(g[0].key, g);
+    for (const s of g) primary.set(s.key, g[0].key);
+  }
+  dedupCache = { size: S.servers.size, at: Date.now(), primary, groups };
+  return dedupCache;
+}
+const isMirror = (s) => { const p = dedup().primary.get(s.key); return !!p && p !== s.key; };
+const mirrorsOf = (key) => { const g = dedup().groups.get(key); return g ? g.length - 1 : 0; };
+/** Every server in the database with duplicates collapsed. */
+const uniqueServers = () => [...S.servers.values()].filter((s) => !isMirror(s));
+
 function rowsFor(tab) {
   if (tab === 'favorites') {
     return S.state.favorites.map((k) => S.servers.get(k) || placeholder(k)).filter(notHidden);
@@ -209,7 +253,7 @@ function rowsFor(tab) {
   if (tab === 'history') {
     return S.state.history.map((h) => ({ ...(S.servers.get(h.key) || placeholder(h.key, h)), joinedAt: h.joinedAt })).filter(notHidden);
   }
-  return [...S.servers.values()].filter((s) => notHidden(s) && passesFilters(s));
+  return uniqueServers().filter((s) => notHidden(s) && passesFilters(s));
 }
 
 function toggleHidden(key) {
@@ -333,9 +377,9 @@ function renderNow() {
   $('#tbody').innerHTML = rows.map(rowHTML).join('');
   $('#table-wrap').scrollTop = scroll;
 
-  const total = S.servers.size;
+  const total = uniqueServers().length;
   $('#c-favorites').textContent = S.state.favorites.length;
-  $('#c-browse').textContent = S.tab === 'browse' ? rows.length : [...S.servers.values()].filter((s) => notHidden(s) && passesFilters(s)).length;
+  $('#c-browse').textContent = S.tab === 'browse' ? rows.length : uniqueServers().filter((s) => notHidden(s) && passesFilters(s)).length;
   $('#c-history').textContent = S.state.history.length;
   $$('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === S.tab));
   $('#list-title').textContent = { favorites: 'Favorites', browse: 'Browse', history: 'History' }[S.tab];
@@ -410,7 +454,7 @@ function renderDetails() {
         <span>${s.gametype ? `<span class="badge ${gtClass(s.gametype)}">${esc(s.gametype)}</span>` : ''}</span>
         <span>Map <b>${esc(mapLabel(s.map))}</b></span>
         <span>Players <b>${s.online ? `${s.players}/${s.maxPlayers}` : '—'}</b></span>
-        <span>Address <b>${esc(s.ip)}:${esc(s.gamePort)}</b></span>
+        <span>Address <b>${esc(s.ip)}:${esc(s.gamePort)}</b>${mirrorsOf(s.key) ? ` <span class="muted" title="Steam also lists this server under other IP addresses that answer with identical info. They're merged into this row.">(+${mirrorsOf(s.key)} duplicate address${mirrorsOf(s.key) > 1 ? 'es' : ''} merged)</span>` : ''}</span>
         ${s.version ? `<span>Version <b>${esc(s.version)}</b></span>` : ''}
         <span>BattlEye <b>${s.battleye ? 'On' : 'Off'}</b></span>
         ${s.password ? '<span><b style="color:var(--warn)">Password protected</b></span>' : ''}
@@ -440,7 +484,7 @@ function renderFilters() {
   // maps: discovered (with counts) + known
   // one alphabetical list: every discovered map (with server counts) plus every known zombie map
   const mapCounts = new Map();
-  const shownServers = [...S.servers.values()].filter((s) => !f.excludeGametypes.includes(s.gametype));
+  const shownServers = uniqueServers().filter((s) => !f.excludeGametypes.includes(s.gametype));
   for (const s of shownServers) if (s.map) { const k = s.map.toLowerCase(); mapCounts.set(k, (mapCounts.get(k) || 0) + 1); }
   const maps = new Map(); // lowercase key -> { value, label, count }
   for (const k of Object.keys(S.knownMaps)) maps.set(k, { value: k, label: S.knownMaps[k], count: 0 });
@@ -454,8 +498,7 @@ function renderFilters() {
   // mods datalist
   // mods used by servers in the game modes currently shown, alphabetical
   const modCounts = new Map();
-  for (const s of S.servers.values()) {
-    if (f.excludeGametypes.includes(s.gametype)) continue;
+  for (const s of shownServers) {
     for (const n of new Set(modNames(s))) modCounts.set(n, (modCounts.get(n) || 0) + 1);
   }
   const mods = [...modCounts].sort((a, b) => alpha(a[0], b[0]));
@@ -467,7 +510,7 @@ function renderFilters() {
 
   // gametypes
   const counts = {};
-  for (const s of S.servers.values()) counts[s.gametype] = (counts[s.gametype] || 0) + 1;
+  for (const s of uniqueServers()) counts[s.gametype] = (counts[s.gametype] || 0) + 1;
   const gts = [...new Set([...S.knownGametypes, ...Object.keys(S.catalog.gametypes), ...Object.keys(counts)])].filter((g) => g && g !== 'null' && g !== 'undefined');
   gts.sort((a, b) => (counts[b] || 0) - (counts[a] || 0) || a.localeCompare(b));
   const shown = S.showAllGametypes ? gts : gts.filter((g) => counts[g] || f.excludeGametypes.includes(g));
@@ -850,12 +893,13 @@ function renderProgress() {
   if (p.phase === 'refresh') { txt = `Refreshing known zombie servers… ${p.done}/${p.total}`; pct = p.total ? p.done / p.total : 0; }
   else if (p.phase === 'discover') {
     txt = p.listing
-      ? `Getting the server list from Steam… ${p.masterCount} Arma 3 servers so far · ${p.done} checked · ${S.servers.size} zombie servers found`
-      : `Checking ${p.masterCount} Arma 3 servers for zombies… ${p.done}/${p.total} · ${S.servers.size} found`;
+      ? `Getting the server list from Steam… ${p.masterCount} Arma 3 servers so far · ${p.done} checked · ${uniqueServers().length} zombie servers found`
+      : `Checking ${p.masterCount} Arma 3 servers for zombies… ${p.done}/${p.total} · ${uniqueServers().length} found`;
     pct = p.total ? p.done / p.total : 0;
   }
   else {
-    txt = `${S.servers.size} zombie server${S.servers.size === 1 ? '' : 's'} in database`;
+    const n = uniqueServers().length;
+    txt = `${n} zombie server${n === 1 ? '' : 's'} in database`;
     if (p.at) txt += ` · last scan ${new Date(p.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
     if (p.note && p.note.code === 'NOARMA') txt += ' · set your Arma 3 folder in Settings to find new servers';
     else if (p.note) txt += ' · could not get new servers from Steam: ' + p.note.message;

@@ -25,6 +25,8 @@ running a zombie mod. Regular Exile and other non-zombie servers are filtered ou
 * Row buttons: refresh, player list, download required mods, and **server info**. Server info shows details, the
   required mods with sizes, and the estimated download size to join.
 * **Right-click menu**: join, download mods, info, players, refresh, favorite, copy IP, hide/unhide, remove from history.
+* **Duplicate servers are merged**: when one server shows up under many IP addresses that all answer with identical info
+  (mirrors/relays), it's listed once, at the address Steam currently lists (or the one you favorited or joined).
 * **Hide servers** you never want to see. They disappear from every tab unless **Show → Hidden servers** is on.
 * **Auto-update**: on launch the portable .exe checks GitHub's latest release, then downloads and verifies the new version
   (size + SHA-256). It updates on **Restart now** or when you close the launcher. You can turn this off in Settings.

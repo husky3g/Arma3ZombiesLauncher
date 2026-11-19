@@ -278,9 +278,12 @@ table.servers { width: 100%; border-collapse: collapse; table-layout: fixed; }
   margin: 12px 0 14px; padding: 16px 18px;
   background: linear-gradient(180deg, rgba(26, 18, 19, .96), rgba(16, 14, 15, .96));
   border: 1px solid #3a1418; border-radius: 8px;
-  display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 18px;
-  max-height: 38%; min-height: 170px;
+  display: grid; grid-template-columns: minmax(0, 1fr) 260px; grid-template-rows: minmax(0, 1fr); gap: 18px;
+  max-height: max(38%, 240px); min-height: 170px; flex: none; overflow: hidden;
 }
+/* the name and info lines keep their size; only the mod list shrinks and scrolls */
+.details .left > :not(.modlist) { flex: none; }
+.details .modlist { flex: 1 1 auto; min-height: 0; }
 .details h3 { margin: 0 0 4px; font: 600 20px var(--font-head); letter-spacing: .04em; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .details .meta { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); font-size: 12.5px; margin-bottom: 10px; }
 .details .meta b { color: var(--text-2); font-weight: 500; }

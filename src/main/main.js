@@ -10,8 +10,9 @@ const arma = require('./arma');
 const { workshopDetails } = require('./workshop-info');
 const { discoverViaSteam, stopSteamDiscovery } = require('./steam-discovery');
 const { Updater } = require('./updater');
+const { LaunchWatch } = require('./launch-watch');
 
-let win, store, client, scanner, env = {}, rescanTimer = null, worker = null, updater = null;
+let win, store, client, scanner, env = {}, rescanTimer = null, worker = null, updater = null, launchWatch = null;
 
 // Portable builds tell us where the real .exe lives (the app itself runs from a temp folder).
 // ZL_UPDATE_EXE / ZL_FAKE_VERSION exist only to test the update flow.
@@ -50,7 +51,12 @@ function createWindow() {
 function scheduleRescan() {
   clearInterval(rescanTimer);
   const mins = Math.max(3, +store.state.data.settings.rescanMinutes || 15);
-  rescanTimer = setInterval(() => scanner.scan(), mins * 60e3);
+  rescanTimer = setInterval(async () => {
+    // The Steam server-list helper briefly signs in as "Arma 3"; never do that while the game is starting or running.
+    if (launchWatch && launchWatch.pending) return;
+    if (await arma.isRunning()) return;
+    scanner.scan();
+  }, mins * 60e3);
 }
 
 function publicState() {
@@ -273,9 +279,17 @@ ipcMain.handle('join', async (_e, key, password, { ignoreMissing = false } = {})
   const modPaths = mods.filter((m) => m.installed && m.path).map((m) => m.path);
   // The server-list helper briefly runs as "Arma 3" in Steam; stop it so Steam lets the real game start.
   if (stopSteamDiscovery()) { log('stopped server-list helper before launch'); await new Promise((r) => setTimeout(r, 1500)); }
+  if (!launchWatch || launchWatch.steamRoot !== env.steamRoot) {
+    if (launchWatch) launchWatch.stop();
+    launchWatch = new LaunchWatch({ steamRoot: env.steamRoot, isRunning: arma.isRunning, log });
+    launchWatch.steamRoot = env.steamRoot;
+    launchWatch.on('launch', (ev) => send('launch', ev));
+  }
+  const settings = store.state.data.settings;
+  launchWatch.begin({ viaSteam: settings.launchMethod !== 'direct' });
   let res;
-  try { res = arma.launch(env, store.state.data.settings, s, { password, modPaths }); }
-  catch (e) { log('launch failed', e.message); throw e; }
+  try { res = arma.launch(env, settings, s, { password, modPaths }); }
+  catch (e) { launchWatch.stop(); log('launch failed', e.message); throw e; }
   log('launched via', res.method, 'args:', res.args.map((a) => (a.startsWith('-password=') ? '-password=***' : a)));
   const d = store.state.data;
   d.history = [{ key, joinedAt: Date.now(), name: s.name, map: s.map }, ...d.history.filter((h) => h.key !== key)].slice(0, 200);

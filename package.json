@@ -1,7 +1,7 @@
 {
   "name": "zombies-launcher",
   "productName": "Zombies Launcher",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Arma 3 server browser that only shows zombie servers",
   "main": "src/main/main.js",
   "scripts": {

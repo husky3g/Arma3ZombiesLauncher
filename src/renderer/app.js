@@ -659,10 +659,42 @@ async function join(key, knownPassword) {
     if (r.ok) {
       S.state.history = r.history;
       S.launchingUntil = Date.now() + 90e3;
-      toast(`<b>Starting Arma 3…</b><br>Connecting to ${esc(s.name)}. The game window can take a minute to appear while mods load.`, 'ok', 12000);
+      S.launchKey = key; S.launchPassword = password;
+      showLaunchToast(`<b>Starting Arma 3…</b><br>Connecting to ${esc(s.name)}. The game window can take a minute to appear while mods load.`, 'ok', 12000);
       render();
     }
   } catch (e) { toast('Could not launch: ' + esc(e.message), '', 8000); }
+}
+
+// One toast that follows the launch: Steam dialogs waiting for the player, success, or "nothing happened".
+let launchToast = null;
+function showLaunchToast(html, cls = '', ms = 0) {
+  if (launchToast) launchToast.remove();
+  const el = launchToast = toast(html, cls, ms);
+  el.onclick = (e) => {
+    const b = e.target.closest('[data-launch]'); if (!b) return;
+    if (b.dataset.launch === 'steam') zl.openExternal('steam://open/main');
+    if (b.dataset.launch === 'retry') { el.remove(); S.launchingUntil = 0; if (S.launchKey) join(S.launchKey, S.launchPassword); }
+    if (b.dataset.launch === 'close') el.remove();
+  };
+  return el;
+}
+function onLaunch(ev) {
+  const steamBtn = `<button class="btn small" data-launch="steam">Show Steam</button>`;
+  const closeBtn = `<button class="btn small" data-launch="close">Dismiss</button>`;
+  const row = (...b) => `<div style="margin-top:10px;display:flex;gap:8px">${b.join('')}</div>`;
+  if (ev.status === 'waiting') {
+    S.launchingUntil = 0; // let the player click Join again if they cancel Steam's dialog
+    showLaunchToast(`<b>${esc(ev.title)}</b><br>${ev.text}${row(steamBtn, closeBtn)}`, 'warn');
+  } else if (ev.status === 'continuing') {
+    showLaunchToast('<b>Starting Arma 3…</b><br>Steam is continuing the launch.', 'ok', 8000);
+  } else if (ev.status === 'started') {
+    S.launchingUntil = 0;
+    if (launchToast) launchToast.remove();
+  } else if (ev.status === 'failed') {
+    S.launchingUntil = 0;
+    showLaunchToast(`<b>Arma 3 didn't start</b><br>${esc(ev.message)}${row(steamBtn, `<button class="btn small" data-launch="retry">Try again</button>`, closeBtn)}`, 'warn');
+  }
 }
 
 // ======================================================================
@@ -998,6 +1030,7 @@ function wire() {
   zl.onProgress((p) => { S.progress = p; renderProgress(); if (p.phase === 'idle') { renderFilters(); render(); } });
   zl.onCatalog((c) => { S.catalog = c; throttleFilters(); });
   zl.onDownload(onDownload);
+  zl.onLaunch(onLaunch);
   zl.onUpdate(onUpdate);
 }
 let filtTimer = null;

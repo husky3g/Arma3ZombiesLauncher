@@ -69,6 +69,9 @@ Nothing to set up. Players only need Steam running (which Arma 3 needs anyway).
 ## Joining and mods
 * **Join** launches through Steam (`-applaunch 107410 -noLauncher [-useBE]`) with `-connect/-port/-password/-mod`.
   It won't start a second copy while Arma 3 is already running.
+* After you click Join, the launcher follows the launch through Steam's log until the game starts. If Steam is waiting on a
+  dialog (for example "your account is already playing Arma 3 elsewhere") or the game doesn't start, it tells you, with
+  **Show Steam** and **Try again** buttons. Rescans pause while the game is starting or running.
 * **Download** subscribes to the server's Workshop mods through the Steam client (steamworks.js, run in a
   short-lived helper process) and shows progress. After a download from the Join prompt, the launcher joins automatically.
 * Download size estimates come from Steam's public Workshop details endpoint (no key needed).
